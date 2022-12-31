@@ -1,1 +1,0 @@
-/Users/kim/src/from-objects-to-functions/zettai/build/classes/kotlin/main/com/zettai/ApplicationKt$main$handler$1.class:/Users/kim/src/from-objects-to-functions/zettai/build/classes/kotlin/main/com/zettai/ApplicationKt.class

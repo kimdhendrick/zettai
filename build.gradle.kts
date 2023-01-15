@@ -23,14 +23,18 @@ repositories {
 }
 
 dependencies {
-    testImplementation(kotlin("test"))
     implementation("org.http4k:http4k-core:$http4kVersion")
     implementation("org.http4k:http4k-server-jetty:$http4kVersion")
+
+    testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:$junitLauncherVersion")
-    testImplementation("org.http4k:http4k-client-jetty:$http4kVersion")
-    testImplementation("com.ubertob.pesticide:pesticide-core:$pesticideVersion")
     testImplementation("io.strikt:strikt-core:$striktVersion")
+
+    testImplementation("com.ubertob.pesticide:pesticide-core:$pesticideVersion")
+
+    testImplementation("org.http4k:http4k-client-jetty:$http4kVersion")
+
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:$junitLauncherVersion")
 }
 
 tasks.test {

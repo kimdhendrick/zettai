@@ -17,7 +17,17 @@ data class ToDoList(val listName: ListName, val items: List<ToDoItem>)
 // enum class ToDoStatus { Todo, InProgress, Done, Blocked }
 data class HtmlPage(val raw: String)
 
-class Zettai(val lists: Map<User, List<ToDoList>>) : HttpHandler {
+interface ZettaiHub {
+    fun getList(user: User, listName: ListName): ToDoList?
+}
+
+class ToDoListHub(private val lists: Map<User, List<ToDoList>>) : ZettaiHub {
+    override fun getList(user: User, listName: ListName): ToDoList? =
+        lists[user]
+            ?.firstOrNull { it.listName == listName }
+}
+
+class Zettai(private val hub: ZettaiHub) : HttpHandler {
     val routes = routes(
         "/todo/{user}/{list}" bind Method.GET to ::showList,
     )
@@ -29,19 +39,18 @@ class Zettai(val lists: Map<User, List<ToDoList>>) : HttpHandler {
             .let(::renderHtml)
             .let(::createResponse)
 
-    fun extractListData(request: Request): Pair<User, ListName> {
+    private fun extractListData(request: Request): Pair<User, ListName> {
         val user = request.path("user").orEmpty()
         val list = request.path("list").orEmpty()
 
         return User(user) to ListName(list)
     }
 
-    fun fetchListContent(listId: Pair<User, ListName>): ToDoList =
-        lists[listId.first]
-            ?.firstOrNull() { it.listName == listId.second }
+    private fun fetchListContent(listId: Pair<User, ListName>): ToDoList =
+        hub.getList(listId.first, listId.second)
             ?: error("List unknown")
 
-    fun renderHtml(todoList: ToDoList): HtmlPage =
+    private fun renderHtml(todoList: ToDoList): HtmlPage =
         HtmlPage(
             """
             <html>
@@ -56,12 +65,12 @@ class Zettai(val lists: Map<User, List<ToDoList>>) : HttpHandler {
             """.trimIndent(),
         )
 
-    fun renderItems(items: List<ToDoItem>) =
-        items.map {
+    private fun renderItems(items: List<ToDoItem>) =
+        items.joinToString("") {
             """<tr><td>${it.description}</td></tr>""".trimIndent()
-        }.joinToString("")
+        }
 
-    fun createResponse(html: HtmlPage): Response =
+    private fun createResponse(html: HtmlPage): Response =
         Response(Status.OK).body(html.raw)
 
     override fun invoke(request: Request): Response = routes(request)

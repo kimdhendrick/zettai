@@ -124,7 +124,7 @@ class SeeATodoListAT {
 
     private fun startTheApplication(lists: Map<User, List<ToDoList>>): ApplicationForAT {
         val port = 8081
-        val server = Zettai(lists).asServer(Jetty(port))
+        val server = Zettai(ToDoListHub(lists)).asServer(Jetty(port))
         server.start()
 
         val client = ClientFilters

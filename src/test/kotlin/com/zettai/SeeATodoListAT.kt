@@ -1,39 +1,36 @@
 package com.zettai
 
 import org.http4k.client.JettyClient
-import org.http4k.core.Method
-import org.http4k.core.Request
-import org.http4k.core.Status
+import org.http4k.core.*
+import org.http4k.filter.ClientFilters
 import org.http4k.server.Jetty
+import org.http4k.server.asServer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
+import org.opentest4j.AssertionFailedError
 import strikt.api.expectThat
+import strikt.api.expectThrows
 import strikt.assertions.isEqualTo
-import org.http4k.server.asServer
 
-class SeeATodoListAT {
-    @Test
-    fun `List owners can see their lists`() {
-        val user = "Frank"
-        val listName = "shopping"
-        val foodToBuy = listOf("carrots", "apples", "milk")
+interface Actions {
+    fun getToDoList(user: String, listName: String): ToDoList?
+}
 
-        startTheApplication(user, listName, foodToBuy)
+typealias Step = Actions.() -> Unit
 
-        val list = getToDoList(user, listName)
-
-
-        expectThat(list.listName.name).isEqualTo(listName)
-        expectThat(list.items.map(ToDoItem::description)).isEqualTo(foodToBuy)
-    }
-
-    private fun getToDoList(user: String, listName: String): ToDoList {
-        val client = JettyClient()
-        val response = client(Request(Method.GET, "http://localhost:8081/todo/$user/$listName"))
+class ApplicationForAT(val client: HttpHandler, private val server: AutoCloseable) : Actions {
+    override fun getToDoList(user: String, listName: String): ToDoList {
+        val response = client(Request(Method.GET, "/todo/$user/$listName"))
         return if (response.status == Status.OK) {
             parseResponse(response.bodyString())
         } else {
             fail(response.toMessage())
+        }
+    }
+
+    fun runScenario(vararg steps: Step) {
+        server.use {
+            steps.onEach { it(this) }
         }
     }
 
@@ -42,14 +39,6 @@ class SeeATodoListAT {
         val items = extractItems(html)
         return ToDoList(listName, items)
     }
-
-    private fun extractItems(html: String): List<ToDoItem> =
-        "<td>(.*?)<"
-            .toRegex()
-            .findAll(html)
-            .map(::extractItemDesc)
-            .map(::ToDoItem)
-            .toList()
 
     private fun extractListName(html: String): ListName =
         "<h2>(.*)<"
@@ -60,14 +49,83 @@ class SeeATodoListAT {
             .orEmpty()
             .let(::ListName)
 
+    private fun extractItems(html: String): List<ToDoItem> =
+        "<td>(.*?)<"
+            .toRegex()
+            .findAll(html)
+            .map(::extractItemDesc)
+            .map(::ToDoItem)
+            .toList()
+
     private fun extractItemDesc(matchResult: MatchResult): String {
         return matchResult.groups[1]?.value.orEmpty()
     }
+}
 
-    private fun startTheApplication(user: String, listName: String, items: List<String>) {
-        val toDoList = ToDoList(ListName(listName), items.map(::ToDoItem))
-        val lists = mapOf(User(user) to listOf(toDoList))
-        val server = Zettai(lists).asServer(Jetty(8081))
+interface ScenarioActor {
+    val name: String
+}
+
+class ToDoListOwner(override val name: String) : ScenarioActor {
+    fun canSeeTheList(listName: String, items: List<String>): Step = {
+        val expectedList = createList(listName, items)
+        val list = getToDoList(name, listName)
+        expectThat(list).isEqualTo(expectedList)
+    }
+
+    fun cannotSeeTheList(listName: String): Step = {
+        expectThrows<AssertionFailedError> {
+            getToDoList(name, listName)
+        }
+    }
+}
+
+fun ToDoListOwner.asUser(): User = User(name)
+
+private fun createList(listName: String, items: List<String>) = ToDoList(ListName(listName), items.map(::ToDoItem))
+
+class SeeATodoListAT {
+    private val frank = ToDoListOwner("Frank")
+    private val shoppingItems = listOf("carrots", "apples", "milk")
+    private val frankList = createList("shopping", shoppingItems)
+
+    private val bob = ToDoListOwner("Bob")
+    private val gardenItems = listOf("fix the fence", "mowing the lawn")
+    private val bobList = createList("gardening", gardenItems)
+
+    private val lists: Map<User, List<ToDoList>> = mapOf(
+        frank.asUser() to listOf(frankList),
+        bob.asUser() to listOf(bobList)
+    )
+
+    @Test
+    fun `List owners can see their lists`() {
+        val app = startTheApplication(lists)
+        app.runScenario(
+            frank.canSeeTheList("shopping", shoppingItems),
+            bob.canSeeTheList("gardening", gardenItems)
+        )
+    }
+
+    @Test
+    fun `Only owners can see their lists`() {
+        val app = startTheApplication(lists)
+
+        app.runScenario(
+            frank.cannotSeeTheList("gardening"),
+            bob.cannotSeeTheList("shopping")
+        )
+    }
+
+    private fun startTheApplication(lists: Map<User, List<ToDoList>>): ApplicationForAT {
+        val port = 8081
+        val server = Zettai(lists).asServer(Jetty(port))
         server.start()
+
+        val client = ClientFilters
+            .SetBaseUriFrom(Uri.of("http://localhost:$port/"))
+            .then(JettyClient())
+
+        return ApplicationForAT(client, server)
     }
 }

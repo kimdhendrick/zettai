@@ -1,6 +1,10 @@
 package com.zettai
 
-import org.http4k.core.*
+import org.http4k.core.HttpHandler
+import org.http4k.core.Method
+import org.http4k.core.Request
+import org.http4k.core.Response
+import org.http4k.core.Status
 import org.http4k.routing.bind
 import org.http4k.routing.path
 import org.http4k.routing.routes
@@ -10,9 +14,8 @@ data class ListName(val name: String)
 data class ToDoItem(val description: String)
 data class ToDoList(val listName: ListName, val items: List<ToDoItem>)
 
-//enum class ToDoStatus { Todo, InProgress, Done, Blocked }
+// enum class ToDoStatus { Todo, InProgress, Done, Blocked }
 data class HtmlPage(val raw: String)
-
 
 class Zettai(val lists: Map<User, List<ToDoList>>) : HttpHandler {
     val routes = routes(
@@ -25,7 +28,6 @@ class Zettai(val lists: Map<User, List<ToDoList>>) : HttpHandler {
             .let(::fetchListContent)
             .let(::renderHtml)
             .let(::createResponse)
-
 
     fun extractListData(request: Request): Pair<User, ListName> {
         val user = request.path("user").orEmpty()
@@ -51,7 +53,7 @@ class Zettai(val lists: Map<User, List<ToDoList>>) : HttpHandler {
                 </table>
                 </body>
             </html>
-        """.trimIndent()
+            """.trimIndent(),
         )
 
     fun renderItems(items: List<ToDoItem>) =

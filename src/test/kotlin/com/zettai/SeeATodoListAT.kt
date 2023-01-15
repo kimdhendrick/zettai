@@ -1,7 +1,12 @@
 package com.zettai
 
 import org.http4k.client.JettyClient
-import org.http4k.core.*
+import org.http4k.core.HttpHandler
+import org.http4k.core.Method
+import org.http4k.core.Request
+import org.http4k.core.Status
+import org.http4k.core.Uri
+import org.http4k.core.then
 import org.http4k.filter.ClientFilters
 import org.http4k.server.Jetty
 import org.http4k.server.asServer
@@ -44,8 +49,8 @@ class ApplicationForAT(val client: HttpHandler, private val server: AutoCloseabl
         "<h2>(.*)<"
             .toRegex()
             .find(html)?.let {
-                it.groups[1]?.let(MatchGroup::value)
-            }
+            it.groups[1]?.let(MatchGroup::value)
+        }
             .orEmpty()
             .let(::ListName)
 
@@ -95,7 +100,7 @@ class SeeATodoListAT {
 
     private val lists: Map<User, List<ToDoList>> = mapOf(
         frank.asUser() to listOf(frankList),
-        bob.asUser() to listOf(bobList)
+        bob.asUser() to listOf(bobList),
     )
 
     @Test
@@ -103,7 +108,7 @@ class SeeATodoListAT {
         val app = startTheApplication(lists)
         app.runScenario(
             frank.canSeeTheList("shopping", shoppingItems),
-            bob.canSeeTheList("gardening", gardenItems)
+            bob.canSeeTheList("gardening", gardenItems),
         )
     }
 
@@ -113,7 +118,7 @@ class SeeATodoListAT {
 
         app.runScenario(
             frank.cannotSeeTheList("gardening"),
-            bob.cannotSeeTheList("shopping")
+            bob.cannotSeeTheList("shopping"),
         )
     }
 
